@@ -1,0 +1,7 @@
+MANIFEST
+Makefile.PL
+demo/dynatabframe.pl
+DynaTabFrame.pm
+Changes.txt
+t/01dynatabframe.t
+

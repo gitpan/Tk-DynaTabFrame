@@ -1,0 +1,176 @@
+<HTML>
+<HEAD>
+<TITLE>Tk::DynaTabFrame - An alternative to the NoteBook widget : a tabbed geometry manager
+	with dynamically stacking tabs</TITLE>
+<LINK REV="made" HREF="mailto:">
+</HEAD>
+
+<BODY>
+<center><H2>Tk::DynaTabFrame</h2><br>
+<h4>Version 0.06</h4><p>
+<img src='dynatf.gif'><p>
+<a href='http://www.presicient.com/dynatabframe/Tk-DynaTabFrame-0.06.tar.gz'><b>Download it here.</B></a><br>
+<p></center>
+
+<A NAME="__index__"></A>
+<!-- INDEX BEGIN -->
+
+<UL>
+
+	<LI><A HREF="#name">NAME</A></LI>
+	<LI><A HREF="#synopsis">SYNOPSIS</A></LI>
+	<LI><A HREF="#description">DESCRIPTION</A></LI>
+	<LI><A HREF="#caveats">CAVEATS</A></LI>
+	<LI><A HREF="#authors">AUTHORS</A></LI>
+	<LI><A HREF="#history">HISTORY</A></LI>
+</UL>
+<!-- INDEX END -->
+
+<HR>
+<P>
+<HR>
+<H1><A NAME="name">NAME</A></H1>
+<P>Tk::DynaTabFrame - An alternative to the NoteBook widget : a tabbed geometry manager
+with dynamically stacking tabs</P>
+<P>
+<HR>
+<H1><A NAME="synopsis">SYNOPSIS</A></H1>
+<PRE>
+    use Tk::DynaTabFrame;</PRE>
+<PRE>
+    $TabbedFrame = $widget-&gt;DynaTabFrame
+       (
+        -font =&gt; '-adobe-times-medium-r-normal--20-*-*-*-*-*-*-*',
+        -tabcurve =&gt; 2,
+        -padx =&gt; 5,
+        -pady =&gt; 5,
+        -raisecmd =&gt; \&amp;raise_callback
+        -tablock =&gt; undef
+        [normal frame options...],
+       );</PRE>
+<PRE>
+    font     - font for tabs
+    tabcurve - curve to use for top corners of tabs
+    padx     - padding on either side of children
+    pady     - padding above and below children
+    raisecmd - code ref invoked on a raise event; passes
+        the caption of the raised tab
+    tablock  - locks the resize of the tabs; when set to a true
+         value, the tabs will not be rearranged when the enclosing
+         window is resized; default off (ie, tabs are rearranged
+         on resize)</PRE>
+<PRE>
+    $CurrentSelection = $Window-&gt;cget ('-current');
+    $CurrentSelection = $Window-&gt;cget ('-raised');
+    $CurrentCaption = $Window-&gt;cget ('-raised_name');</PRE>
+<PRE>
+    current  - (Readonly) currently selected widget
+    raised   - (Readonly) currently selected widget
+    raised_name   - (Readonly) caption of currently selected widget
+</PRE>
+<PRE>
+
+    $Tabs = $Window-&gt;cget ('-tabs');</PRE>
+<PRE>
+
+    $Tabs - a hashref of the tab Button widgets,
+        keyed by the associated caption. Useful for
+        e.g., attaching balloons to the tabs</PRE>
+<PRE>
+    $frame = $TabbedFrame-&gt;add
+       (
+        -caption =&gt; 'Tab label',
+        -tabcolor =&gt; 'yellow',
+       );</PRE>
+<PRE>
+    caption  - label text for the widget's tab
+    tabcolor - background for the tab button
+</PRE>
+<PRE>
+
+    Returns a new Frame widget to be populated by the application.</PRE>
+<PRE>
+
+    $TabbedFrame-&gt;delete($caption);</PRE>
+<PRE>
+
+    Deletes the tab/frame specified by $caption (if it exists).</PRE>
+<PRE>
+
+    $TabbedFrame-&gt;raise($caption):</PRE>
+<PRE>
+
+    Raises the tab/frame specified by $caption (if it exists).</PRE>
+<P>Values shown above are defaults.</P>
+<P>
+<HR>
+<H1><A NAME="description">DESCRIPTION</A></H1>
+<P>[ NOTE: This module is derived directly from Tk::TabFrame...
+tho you probably can't tell it anymore ]</P>
+<P>A Notebook with dynamically rearranging tabs. When you resize
+a window, the tabs will either stack or unstack as needed to
+fit the enclosing widget's width. Likewise, when tabs are added
+or removed, the tabs will stack/unstack as needed.</P>
+<P>Tabs are added  at the bottom row, left side, and automatically
+become the ``raised'' tab upon being added. The tabs can be
+raised by both mouse clicking, or by using left and right
+keyboard arrows to traverse the tabbing order. If a tab
+in a row other than the bottom row is raised, all rows are rotated
+down, with bottom rows wrapping back to the top, until
+the raised row is moved to the bottom row.</P>
+<P>NOTE: As of V. 0.02, unfilled top rows no longer cause
+all tabs to rearrange when the top row is raised. However,
+removing or adding a tab, or resizing the enclosing widget
+with -tablock turned off, *does* cause tab rearrangement.</P>
+
+<P>
+<HR>
+<H1><A NAME="caveats">CAVEATS</A></H1>
+<P>As of v 0.02, this widget may be appropriate
+for configuration dialogs, as the tab movement
+is no longer chaotic, assuming no tab removals/additions
+occur, and -tablock is turned on, after the initial
+dialog setup is complete.</P>
+<P>As of Ver. 0.04, if the currently raised tab is removed,
+the leftmost tab of the bottom row becomes the raised tab. Prior
+behavior (attempting to raise the nearest neighbor tab) created
+more problems than it solved.</P>
+<P>Use with *optional* horizontal scrolled frames (ie, 'os')
+seems to cause some race conditions (Config events keep
+resizing the frame up, then down)</P>
+<P>
+<HR>
+<H1><A NAME="authors">AUTHORS</A></H1>
+<P>Dean Arnold, <A HREF="mailto:darnold@presicient.com">darnold@presicient.com</A></P>
+<P>
+<HR>
+<H1><A NAME="history">HISTORY</A></H1>
+<P><TABLE CELLSPACING=0 CELLPADDING=0><TR><TD>January 16, 2004   : Ver. 0.06
+<TR><TD>- fixed programmatic raise
+<TR><TD>- added (simple) install test
+<TR><TD>- added programmatic raise button to demo app</TABLE></P>
+<P><TABLE CELLSPACING=0 CELLPADDING=0><TR><TD>January 13, 2004   : Ver. 0.05
+<TR><TD>- added "pseudo-tabs" to backfill the space
+<TR><TD>	between the right side of last tab in a row,
+<TR><TD>	and the right side of the enclosing frame</TABLE></P>
+<P><TABLE CELLSPACING=0 CELLPADDING=0><TR><TD>January 6, 2004   : Ver. 0.04
+<TR><TD>- fixed TabRemove for remove from arbitrary position
+<TR><TD>- updated demo app to exersize arbitrary position
+<TR><TD>removal
+<TR><TD>- fixed apparent timing issue with TabRemove and
+<TR><TD>resizing that caused occasional phantom client entries</TABLE></P>
+<P><TABLE CELLSPACING=0 CELLPADDING=0><TR><TD>January 5, 2004   : Ver. 0.03
+<TR><TD>- added <CODE>raised_name()</CODE> method/-raised_name property
+<TR><TD>to return caption of currently raised page
+<TR><TD>- fixed tab ordering on resize when raised tab
+<TR><TD>gets moved to other than bottom row</TABLE></P>
+<P><TABLE CELLSPACING=0 CELLPADDING=0><TR><TD>December 29, 2003 : Ver. 0.02
+<TR><TD>- improve raise behavior
+<TR><TD>- improve tab font behavior
+<TR><TD>(use platform/application default when none specified)
+<TR><TD>- added tablock option</TABLE></P>
+<P>December 25, 2003 :	Converted from Tk::TabFrame</P>
+
+</BODY>
+
+</HTML>
