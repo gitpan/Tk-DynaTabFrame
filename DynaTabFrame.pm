@@ -8,7 +8,7 @@ use vars qw ($VERSION);
 use strict;
 use Carp;
 
-$VERSION = '0.06';
+$VERSION = '0.07';
 
 Tk::Widget->Construct ('DynaTabFrame');
 
@@ -119,8 +119,8 @@ sub ConfigDebounce {
 #	only post event if we've changed width significantly
 #
 	return 1 unless (
-		(($w < $this->{OldWidth}) && ($this->{OldWidth} - $w > 10)) ||
-		(($w > $this->{OldWidth}) && ($w - $this->{OldWidth} > 10)));
+		(($w < $this->{OldWidth}) && ($this->{OldWidth} - $w > 13)) ||
+		(($w > $this->{OldWidth}) && ($w - $this->{OldWidth} > 13)));
 
 	$this->{LastConfig} = Tk::timeofday;
 	$this->{LastWidth} = $w;
