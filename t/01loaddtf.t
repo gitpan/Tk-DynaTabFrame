@@ -5,3 +5,4 @@ END {print "not ok 1\n" unless $loaded;}
 use Tk::DynaTabFrame;
 $loaded = 1;
 print "ok 1\n";
+

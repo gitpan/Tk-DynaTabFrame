@@ -1,8 +1,8 @@
-require 5.006;
+require 5.008;
 use ExtUtils::MakeMaker;
 WriteMakefile
   (
    NAME  => 'Tk::DynaTabFrame',
-   VERSION => '0.01',
-   PREREQ_PM => { 'Tk' => '800.024' }
+   VERSION => '0.20',
+   PREREQ_PM => { 'Tk' => '804.027' }
   );
