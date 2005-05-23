@@ -5,13 +5,14 @@ require 5.008;
 
 use Tk;
 use Tk ':variables';
+use Tk::Balloon;
 
 use base qw (Tk::Derived Tk::Frame);
 use vars qw ($VERSION);
 use strict;
 use Carp;
 
-$VERSION = '0.20';
+$VERSION = '0.22';
 #
 #	indexes of our tab properties
 #
@@ -31,6 +32,8 @@ use constant DTF_IDX_FLASH_INTVL => 12;
 use constant DTF_IDX_FLASH_TIME => 13;
 use constant DTF_IDX_FLASH_ID => 14;
 use constant DTF_IDX_FLASHED => 15;
+use constant DTF_IDX_HIDDEN => 16;
+use constant DTF_IDX_TABTIP => 17;
 
 my $close_xpm = << 'end-of-close-xpm';
 /* XPM */
@@ -136,6 +139,7 @@ use constant DTF_ORIENT_ALIGN => 6;
 use constant DTF_ORIENT_DOWNWARD => 7;
 
 use constant DTF_MAX_ROWS => 20;
+use constant DTF_DFLT_TIPTIME => 450;
 
 my %taborient = (
 'nw', [ 'right', 'ne', 'right', 's', 'e', 1, 0, 1, ],
@@ -157,6 +161,8 @@ my %page_opts = (
 '-label', DTF_IDX_LABEL,
 '-raisecmd', DTF_IDX_RAISECMD,
 '-state', '-state',
+'-tabtip', DTF_IDX_TABTIP,
+'-hidden', DTF_IDX_HIDDEN
 );
 
 Tk::Widget->Construct ('DynaTabFrame');
@@ -181,13 +187,16 @@ sub Populate {
         '-raised_name' => ['METHOD'],
         '-tabs' => ['METHOD'],
 		'-delay' => [['SELF', 'PASSIVE'], 'delay', 'Delay', '200'],
-		'-raisecmd' => [['SELF', 'PASSIVE'], 
-			'raisecmd', 'RaiseCmd', undef],
+		'-raisecmd' => [['SELF', 'PASSIVE'], 'raisecmd', 'RaiseCmd', undef],
         '-tablock' => [['SELF', 'PASSIVE'], 'tablock', 'tablock', undef],
         '-tabrotate' => [['SELF', 'PASSIVE'], 'tabrotate', 'tabrotate', 1],
         '-tabside' => ['METHOD'],
         '-tabclose' => ['METHOD'], 
+        '-tabscroll' => ['METHOD'],
         '-tabcolor' => [['SELF', 'PASSIVE'], 'tabcolor', 'tabcolor', undef],
+        '-tabtip' => [['SELF', 'PASSIVE'], 'tabtip', 'tabtip', undef],
+        '-tiptime' => ['METHOD'],
+        '-tipcolor' => ['METHOD'],
         '-textalign' => [['SELF', 'PASSIVE'], 'textalign', 'textalign', 1],
         '-backpagecolor' => [['SELF', 'PASSIVE'], 'tabcolor', 'tabcolor', undef],
         '-raisecolor' => [['SELF', 'PASSIVE'], 'raisecolor', 'raisecolor', undef],
@@ -198,6 +207,8 @@ sub Populate {
 #	set default tab orientation
 #
 	$this->{Side} = 'nw';
+	$this->{_tiptime} = DTF_DFLT_TIPTIME;
+	$this->{_tipcolor} = 'white';
 #
 #	get tab alignment info
 #
@@ -472,7 +483,8 @@ sub TabCreate {
     		$Button->reqheight() : $Button->reqwidth() ),
     	$RaiseColor,	# raised color
     	$RaiseCmd,		# callback for raise operations
-    	$Text			# tab label text
+    	$Text,			# tab label text
+    	1				# start as visible
     	];
 #
 #	reqwidht/height don't seem to include the padx/pady
@@ -1022,6 +1034,9 @@ sub TabRedraw {
 		foreach my $row (@$rows) {
 			foreach (@$row) {
 				my $client = $clients->[$_];
+				next
+					if $client->[DTF_IDX_HIDDEN];
+
 				my $btnw = $extra + $client->[DTF_IDX_WIDTH];
 				my $row = $#$rows;
 
@@ -1374,6 +1389,133 @@ sub TabRemove {
 	return 1;
 }
 #
+#	reveal a previously hidden tab and re-org the tabs
+#
+sub TabReveal {
+	my ($this, $Caption) = @_;
+	$this->{Updating} = 1;
+
+	return undef
+		unless defined($this->{ClientHash}{$Caption});
+
+	my $clients = $this->{ClientList};
+	my $rows = $this->{RowList};
+	my $clientno = $this->{ClientHash}{$Caption};
+	my $client = $clients->[$clientno];
+	return 1
+		unless $client->[DTF_IDX_HIDDEN];
+#
+#	make visible and redraw; note we don't
+#	make it raised yet
+#
+	$client->[DTF_IDX_HIDDEN] = undef;
+#
+#	pack tab in our rowframe 0; redraw if needed
+#	move everything over 1 column in bottom row
+#
+	$clients->[$_][DTF_IDX_COL]++
+		foreach (@{$rows->[0]});
+	unshift @{$rows->[0]}, $clientno;
+#
+#	redraw everything
+#
+	$this->TabRedraw(1);
+	$this->{Updating} = undef;
+#
+#	if nothing is raised, then raise us
+#
+	$this->raise($Caption)
+		unless $this->{Raised};
+	return 1;
+}
+#
+#	hide a single tab and re-org the tabs
+#
+sub TabHide {
+	my ($this, $Caption) = @_;
+	$this->{Updating} = 1;
+
+	return undef 
+		unless defined($this->{ClientHash}{$Caption});
+	
+	my $rows = $this->{RowList};
+	my $clients = $this->{ClientList};
+	my $listsz = $#$clients;
+	my $clientno = $this->{ClientHash}{$Caption};
+	my $client = $clients->[$clientno];
+	my $Widget = $client->[DTF_IDX_WIDGET];
+	my ($r, $c) = ($client->[DTF_IDX_ROW], $client->[DTF_IDX_COL]);
+#
+#	if its the raised widget, then we need to raise 
+#	a tab to replace it (unless its the only widget)
+#	...whatever is left at 0,0 sounds good to me...
+#
+	my $row = $rows->[$r];
+	my $newcurrent = ($client->[DTF_IDX_WIDGET] eq $this->{Raised}) ? 1 : undef;
+#
+#	hide the client
+#
+	$client->[DTF_IDX_HIDDEN] = 1;
+	$client->[DTF_IDX_ROW] = undef;
+	$client->[DTF_IDX_COL] = undef;
+	
+	splice @$row, $c, 1;
+#
+#	adjust client positions in this row
+#
+	$clients->[$row->[$_]][DTF_IDX_COL]--
+		foreach ($c..$#$row);
+#
+#	adjust all our row index lists
+#
+#	foreach my $row (@$rows) {
+#		foreach (0..$#$row) {
+#			$row->[$_]-- if ($row->[$_] > $clientno);
+#		}
+#	}
+#
+#	force us into unraised color
+#
+    my $TabFrame = $this->{ButtonFrame}->Subwidget('Button_'.$Widget);
+    $TabFrame->configure(-background => $client->[DTF_IDX_COLOR]);
+    $TabFrame->Subwidget('Button')->configure(
+    	-bg => $client->[DTF_IDX_COLOR],
+		-activebackground => $client->[DTF_IDX_COLOR]);
+
+	$client->[DTF_IDX_FRAME]->placeForget()
+		if $client->[DTF_IDX_FRAME]->ismapped();
+#
+#	if only tab in row, remove the row
+#	and adjust the clients in following rows
+#
+	if ($#$row < 0) {
+		foreach my $i ($r+1..$#$rows) {
+			$row = $rows->[$i];
+			$clients->[$_][DTF_IDX_ROW] -= 1
+				foreach (@$row);
+		}
+		splice @$rows, $r, 1;
+	}
+
+	if ($#$rows < 0) {
+#
+#	no rows left, clear everything
+#
+		$this->{Raised} = undef;
+		$this->Subwidget('Connector')->placeForget();
+		$this->{CurrentFrame} = undef;
+	}
+	elsif ($newcurrent) {
+		$this->{Raised} = $clients->[$rows->[0][0]][DTF_IDX_WIDGET];
+	}
+#
+#	redraw everything
+#
+	$this->TabRedraw(1);
+	$this->{Updating} = undef;
+	return 1;
+}
+#
 #	compute the tabbing traversal order
 #	note an anomaly:
 #	if the top row doesn't fill the frame, and a top
@@ -1424,7 +1566,55 @@ sub TabOrder {
 	}
 	return 1;
 }
-	
+#
+#	create a tooltip for the tab
+#
+sub CreateTabTip {
+	my ($this, $w, $btn, $tiptext) = @_;
+#
+#	create balloon if none exists
+#
+	$this->{Balloon} = $this->Component(
+		'Balloon' => 'Balloon',
+		-state => 'balloon', 
+		-balloonposition => 'widget',
+		-initwait => $this->{_tiptime},
+		-background => $this->{_tipcolor})
+		unless $this->{Balloon};
+#
+#	attach a balloon if tiptext requested
+#
+	$w->[DTF_IDX_TABTIP] = $tiptext;
+	return $this->{Balloon}->attach($btn, -balloonmsg => $tiptext);
+}
+#
+#	change tab's tip text
+#
+sub UpdateTabTip {
+	my ($this, $w, $btn, $tiptext) = @_;
+
+	return undef unless $this->{Balloon};
+#
+#	attach a balloon if tiptext requested
+#
+	$this->{Balloon}->detach($btn)
+		if $w->[DTF_IDX_TABTIP];
+	$w->[DTF_IDX_TABTIP] = $tiptext;
+	return $this->{Balloon}->attach($btn, -balloonmsg => $tiptext);
+}
+
+#
+#	remove a tooltip from the tab
+#
+sub RemoveTabTip {
+	my ($this, $w, $btn) = shift;
+
+	return 1 unless $this->{Balloon};
+
+	$w->[DTF_IDX_TABTIP] = undef;
+	return $this->{Balloon}->detach($btn);
+}
+
 sub current {
 	shift->TabCurrent (@_);
 }
@@ -1436,10 +1626,11 @@ sub add {
 #
     my $caption;
     $caption = shift
-    	unless ($_[0]=~/^-(caption|tabcolor|raisecolor|image|text)$/);
+    	unless ($_[0]=~/^-(caption|tabcolor|raisecolor|tabtip|hidden|state|label|image|text)$/);
     my %args = @_;
 	$caption = $args{-caption} unless $caption;
-    return $this->TabCreate(
+	return undef unless defined($caption);
+    my $frame = $this->TabCreate(
         $caption,
         delete $args{'-tabcolor'},
         delete $args{'-raisecolor'},
@@ -1447,6 +1638,12 @@ sub add {
         delete $args{'-label'},
         delete $args{'-raisecmd'},
        );
+#
+#	pick up any attributes we didn't process during creation
+#
+    $this->pageconfigure($caption, %args)
+    	if ($frame && %args);
+	return $frame;
 }
 #
 #	turn off flashing tab
@@ -1569,16 +1766,52 @@ sub pageconfigure {
 	my $btn = $w->[DTF_IDX_FRAME]->Subwidget('Button');
 	foreach (keys %args) {
 		next unless defined($page_opts{$_});
+
+		if ($_ eq '-hidden') {
+#
+#	check if hiding the page
+#
+			if ($args{$_}) {
+				next if $w->[DTF_IDX_HIDDEN];
+				$this->TabHide($page);
+			}
+			else {
+#
+#	restore the tab if its hidden
+#
+				$this->TabReveal($page)
+					if $w->[DTF_IDX_HIDDEN];
+			}
+			next;
+		}
 #
 #	make sure we apply state to the close button too
 #
 		$w->[DTF_IDX_FRAME]->Subwidget('CloseBtn')->configure(-state => $args{$_}),
-		$btn->configure(-state => $args{$_}), 
+		$btn->configure(-state => $args{$_}),
 		next
 			if ($_ eq '-state');
 
 		$btn->configure($page_opts{$_} => $args{$_}), next
 			unless ($page_opts{$_}=~/^\d+/);
+#
+#	create, update, or remove the button balloon
+#
+		if ($_ eq '-tabtip') {
+			if ($w->[DTF_IDX_TABTIP]) {
+				if (defined($args{$_})) {
+					$this->UpdateTabTip($w, $btn, $args{$_});
+				}
+				else {
+					$this->RemoveTabTip($w, $btn);
+				}
+			}
+			else {	# no current tip, create one if requested
+				$this->CreateTabTip($w, $btn, $args{$_})
+					if $args{$_};
+			}
+			next;
+		}
 
 		$w->[$page_opts{$_}] = $args{$_};
 #
@@ -1606,6 +1839,26 @@ sub pageconfigure {
 
 sub pages {
 	return keys %{shift->{ClientHash}};
+}
+
+sub tiptime {
+	my ($this, $time) = @_;
+
+	return $this->{_tiptime}
+		unless defined($time);
+	$this->{_tiptime} = $time;
+	return $this->{Balloon} ?
+		$this->{Balloon}->configure(-initwait => $time) : 1;
+}
+
+sub tipcolor {
+	my ($this, $color) = @_;
+
+	return $this->{_tipcolor}
+		unless defined($color);
+	$this->{_tipcolor} = $color;
+	return $this->{Balloon} ?
+		$this->{Balloon}->configure(-background => $color) : 1;
 }
 
 sub font {
@@ -1785,6 +2038,19 @@ sub tabside {
 	return $oldside;
 }
 
+sub tabscroll {
+	my ($this, $scroll) = shift;
+
+	return $this->{Scrolled} unless defined($scroll);
+	return 1 
+		unless ($this->{Scrolled} ^ $scroll);
+#
+#	set to requested state and redraw
+#
+	$this->{Scrolled} = $scroll;
+	return $this->TabRedraw();
+}
+
 sub tabclose {
 	my ($this, $close) = @_;
 
@@ -1954,7 +2220,10 @@ Tk::DynaTabFrame - A NoteBook widget with orientable, dynamically stacking tabs
         -tabpady => 5,
         -tabrotate => 1,
         -tabside => 'nw',
+        -tabscroll => undef,
         -textalign => 1,
+        -tiptime => 600,
+        -tipcolor => 'yellow',
         [normal frame options...],
        );
 
@@ -2029,6 +2298,17 @@ defined background color and a flash color at a specified interval) using
 the L<flash|flash>B<()> method. Flashing continues until either the 
 L<deflash|deflash>B<()> method is called, the tab is raised manually or 
 programmatically, or the specified flash duration expires.
+
+A "tabtip" I<(aka balloon or tooltip)> may be attached to each tab 
+that is displayed when the mouse hovers over the tab. The number of millseconds
+between the mouse entering a tab, and the display of the tabtip is determined
+by the L<-tiptime|-tiptime> option (default 450). The background color
+of the tabtips can be set by the L<-tipcolor|-tipcolor> option (default
+white). The text of each tabtip can be set, updated, or removed, either in 
+the L<add|add>() method, or via L<pageconfigure|pageconfigure>(),
+using the L<-tabtip|-tabtip> option. Note that a L<Tk::Balloon> widget
+is not created for the DynaTabFrame widget until a L<-tiptime|-tiptime>,
+L<-tipcolor|-tipcolor>, or L<-tabtip|-tabtip> is configured.
 
 The widget takes all the options that a Frame does. In addition,
 it supports the following options:
@@ -2121,6 +2401,14 @@ B<Note:> can only be set or changed prior to adding any
 pages; attempts to change the B<-tabside> after pages
 have been added will be silently ignored.
 
+=item B<-tabscroll> I<(not yet implemented)>
+
+When set to a true value, causes tabs to be restricted to
+a single row, with small arrow buttons placed at either end
+of the row to permit scrolling the tabs into/out of the
+window. When a tab is programmatically raised, the tabs will
+be scrolled until the raised tab is visible.
+
 =item B<-textalign>
 
 Aligns text to the tab orientation. When enabled (i.e., set to
@@ -2129,6 +2417,17 @@ tab orientation (i.e., top and bottom tabs have horizontal text,
 side tabs have vertical text). When disabled (i.e., set to undef or 0),
 text will be vertical for top and bottom tabs, and horizontal for
 side tabs.
+
+=item B<-tipcolor>
+
+Sets the background color of any tabtips (default white). 
+Causes creation of a L<Tk::Balloon> widget if none yet exists.
+
+=item B<-tiptime>
+
+Sets the integer number of milliseconds to delay between the time 
+the mouse enters a tab and the display of any defined tabtip. Default 450.
+Causes creation of a L<Tk::Balloon> widget if none yet exists.
 
 =back
 
@@ -2147,8 +2446,7 @@ Returns the page name of the currently raised frame
 =item  B<-tabs>
 
 Returns a hashref of the tab Button widgets,
-keyed by the associated caption. Useful for
-e.g., attaching balloons to the tabs
+keyed by the associated caption.
 
 =back 
 
@@ -2178,6 +2476,12 @@ the tab text if no B<-label> or B<-image> is specified.
 If this option is specified, and the optional I<pageName> argument
 is specified, I<pageName> overrides this option.
 
+=item B<-hidden>
+
+When set to a true value, causes the resulting tab to be hidden from
+view; can later be set to a false value to force the tab to be
+visible again.
+
 =item B<-image>
 
 Specifies an image to display on the tab of this page. The image
@@ -2204,6 +2508,11 @@ the widget-level B<-raisecolor> option for only this tab.
 
 Specifies the unraised background color for the tab. Overrides
 the widget-level B<-tabcolor/-backpagecolor> option for only this tab.
+
+=item B<-tabtip>
+
+Specifies the text of a tabtip to attach to the created tab.
+Causes creation of a L<Tk::Balloon> widget if none yet exists.
 
 =back
 
@@ -2258,6 +2567,9 @@ the values accepted in the L<add|add> method, plus the B<-state> option.
 Like configure for the page indicated by I<pageName>. I<-options> may
 be any of the options accepted by the L<add|add> method, plus the
 B<-state> option.
+
+Note that configuring the L<-tabtip|-tabtip> option to C<undef>
+will remove the tabtip from the page.
 
 =item B<pages>
 
@@ -2346,6 +2658,18 @@ set a minimize callback for an MDI-type notebook.
 
 B<configure(>I<-tabside>B<)> should be permitted after pages are added.
 
+=item Rotated tab text using L<GD>
+
+Newer versions of L<GD> provides better font support, with 90 degree
+rotation. By using L<GD> to render and rotate the tab text as an image,
+sideways text can be used in tabs as images.
+
+=item Single row, scrolled tabs
+
+Support for scrolling tabs, rather than stacking, should be added
+with small arrow buttons added at either end of the tab row when
+some tabs exist beyond the beginning/end of the row.
+
 =back
 
 =head1 AUTHORS
@@ -2367,6 +2691,14 @@ conditions as Perl itself.
 =head1 HISTORY 
 
 =over 4
+
+=item May 22, 2005 : Ver. 0.22
+
+- added -hidden page option
+
+- added -tiptime, -tipcolor global attributes
+
+- added -tabtip page option
 
 =item January 10, 2005 : Ver. 0.20
 

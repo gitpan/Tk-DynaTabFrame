@@ -9,6 +9,7 @@ use Tk::Photo;
 use Tk::BrowseEntry;
 
 use strict;
+use warnings;
 
 my %frames = ();
 my %texts = ();
@@ -50,6 +51,8 @@ my $dtf = $mw->DynaTabFrame(
 	-tabside => $side,
 	-tabpadx => 3,
 	-tabpady => 3,
+	-tiptime => 600,
+	-tipcolor => 'white'
 	)
 	->pack (-side => 'top', -expand => 1, -fill => 'both');
 
@@ -82,7 +85,8 @@ $buttons1->Button
 
 			$frames{$caption} = $dtf->add(
 				-caption => $caption,
-				-label => "Tab No. $tabno",
+#				-label => "Tab No. $tabno",
+				-tabtip => "Tip for $tabno"
 				);
 
 			$texts{$caption} = $frames{$caption}->Scrolled(
@@ -113,6 +117,7 @@ $buttons1->Button
 			$frames{$caption} = $dtf->add(
 				-image => $images[$imgidx++],
 				-caption => $caption, 
+				-tabtip => "Tip for $tabno"
 			);
 			$imgidx = 0 if ($imgidx == scalar @images);
 
@@ -182,14 +187,14 @@ $buttons1->Button
     -padx => 10,
    );
 
-$buttons2->Button
+$buttons1->Button
    (
     -text => 'Flash',
     -command => sub {
     	$dtf->flash($dtf->raised_name, 
     		-color => 'purple',
     		-interval => 400,
-    		-duration => 6
+    		-duration => 6000
     		);}
    )->pack
    (
@@ -199,7 +204,7 @@ $buttons2->Button
     -padx => 10,
    );
 
-$lockbtn = $buttons2->Button
+$lockbtn = $buttons1->Button
    (
     -text => 'Lock',
     -command => \&tablock,
@@ -249,7 +254,9 @@ $buttons2->Button
 
 my $browser = $buttons2->BrowseEntry(
 	-label => 'Tab Side',
-	-browsecmd => \&orient_tabs
+	-browsecmd => \&orient_tabs,
+	-listwidth => 20,
+	-width => 3,
    )->pack
    (
     -side => 'right',
@@ -269,6 +276,36 @@ $browser->insert('end', 'n');
 $browser->insert('end', 's');
 $browser->insert('end', 'e');
 $browser->insert('end', 'w');
+
+$buttons2->Button
+   (
+    -text => 'Hide',
+    -command => \&hide_tab
+   )->pack
+   (
+    -side => 'right',
+    -anchor => 'ne',
+    -fill => 'none',
+    -padx => 10,
+   );
+
+my $hider;
+my $hidden = $buttons2->BrowseEntry(
+	-label => 'Hidden:',
+	-browse2cmd => \&reveal_tab,
+#	-listwidth => 30,
+	-variable => \$hider
+   )->pack
+   (
+    -side => 'right',
+    -anchor => 'ne',
+    -fill => 'none',
+    -padx => 10,
+   );
+
+$mw->update;
+
+#$dtf->configure(-tipcolor => 'white');
 
 Tk::MainLoop();
 #
@@ -292,6 +329,27 @@ sub tablock {
    		$lockbtn->configure(-text => 'Lock');
    		$dtf->configure(-tablock => undef);
    	}
+}
+
+sub hide_tab {
+	my $caption = $dtf->raised_name();
+	return 1 unless $caption;
+	$dtf->pageconfigure($caption, -hidden => 1);
+	$hidden->insert('end', $caption);
+	return 1;
+}
+
+sub reveal_tab {
+	my ($obj, $index) = @_;
+	my $caption = $hidden->get($index);
+	$dtf->pageconfigure($caption, -hidden => undef);
+#
+#	scan for and remove the hidden entry
+#
+	$hidden->delete($index);
+#	$hidden->SubWidget('entry')->delete(0, 'end');
+	$hider = '';
+	return 1;
 }
 
 sub raise_cb { print shift, "\n"; }

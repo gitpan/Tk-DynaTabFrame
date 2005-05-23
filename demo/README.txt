@@ -49,3 +49,11 @@ Remove Tab : removes the currently raised tab
 Add Image Tab : adds a tab with -image
 
 Add Text Tab : adds a tab with -label
+
+Hide : hides the currently raised tab, and adds its 
+	caption to the "Hidden" dropdown box
+
+Reveal: a dropdown box listing currently hidden
+	pages. Selecting an entry and clicking the
+	"Reveal" button will restore the page to the display
+
