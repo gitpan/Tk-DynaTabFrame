@@ -12,7 +12,7 @@ use vars qw ($VERSION);
 use strict;
 use Carp;
 
-$VERSION = '0.22';
+$VERSION = '0.23';
 #
 #	indexes of our tab properties
 #
@@ -1787,8 +1787,12 @@ sub pageconfigure {
 #
 #	make sure we apply state to the close button too
 #
-		$w->[DTF_IDX_FRAME]->Subwidget('CloseBtn')->configure(-state => $args{$_}),
-		$btn->configure(-state => $args{$_}),
+		if ($_ eq '-state') {
+		  if ($w->[DTF_IDX_FRAME]->Subwidget('CloseBtn')) {
+		    $w->[DTF_IDX_FRAME]->Subwidget('CloseBtn')->configure(-state => $args{$_});
+		  }
+		  $btn->configure(-state => $args{$_});
+		}
 		next
 			if ($_ eq '-state');
 
@@ -2194,7 +2198,7 @@ print "FocusOut\n";
 
 __END__
 
-=cut
+=pod
 
 =head1 NAME
 
@@ -2230,8 +2234,8 @@ Tk::DynaTabFrame - A NoteBook widget with orientable, dynamically stacking tabs
 =begin html
 
 <h2>Download</h2><p>
-<a href='http://www.presicient.com/dynatabframe/Tk-DynaTabFrame-0.20.tar.gz'>
-Tk-DynaTabFrame-0.20.tar.gz</a><p>
+<a href='http://www.presicient.com/dynatabframe/Tk-DynaTabFrame-0.23.tar.gz'>
+Tk-DynaTabFrame-0.23.tar.gz</a><p>
 
 <h2>Screenshots</h2><p>
 <img src='imgs/dtfnw.gif'><p>

@@ -1,11 +1,16 @@
-0.21	May 21, 2005
+0.23	May 25, 2005
+
+	- fix for configuring tabs wo/ close buttons
+		(Thanks to Daniel Wikman for the patch)
+
+0.22	May 21, 2005
 
 	- added -hidden page option to make tabs disappear/reappear, 
 	
 	- added -tabtip page option to attach a balloon
 		widget to a tab
 	
-	- added -tiptime, -tipcolor to configure the tabtip balloon
+	- added -tiptime, tipcolor to configure the tabtip balloon
 
 0.20	Jan. 15, 2005
 
